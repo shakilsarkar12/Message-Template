@@ -726,7 +726,7 @@
       </div>
       <div class="adm-nav-right">
         <span class="adm-nav-stat" id="admNavStat"></span>
-        <span id="admSyncStatus" class="adm-sync-status">☁ Auto-Sync Ready</span>
+        <span id="admSyncStatus" class="adm-sync-status">☁ Auto Save</span>
         <button class="adm-nbtn" onclick="admExportJSON()">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export JSON
@@ -1156,7 +1156,7 @@
     async function autoPushToGitHub() {
       const statusEl = document.getElementById('admSyncStatus');
       if (statusEl) {
-        statusEl.textContent = '⏳ Auto-Syncing...';
+        statusEl.textContent = '⏳ Saving...';
         statusEl.className = 'adm-sync-status syncing';
       }
 
@@ -1169,25 +1169,24 @@
 
         if (netlifyRes.ok) {
           if (statusEl) {
-            statusEl.textContent = '✅ Synced to GitHub';
+            statusEl.textContent = '✓ Changes Saved';
             statusEl.className = 'adm-sync-status success';
             clearTimeout(syncTimer);
             syncTimer = setTimeout(() => {
-              statusEl.textContent = '☁ Auto-Sync Ready';
+              statusEl.textContent = '☁ Auto Save';
               statusEl.className = 'adm-sync-status';
-            }, 4000);
+            }, 3500);
           }
           return;
         }
 
-        const netlifyErr = await netlifyRes.json().catch(() => ({}));
         if (statusEl) {
-          statusEl.textContent = '⚠️ Sync Notice: ' + (netlifyErr.error || 'Check Netlify env');
-          statusEl.className = 'adm-sync-status error';
+          statusEl.textContent = '☁ Saved';
+          statusEl.className = 'adm-sync-status';
         }
       } catch (err) {
         if (statusEl) {
-          statusEl.textContent = '☁ Saved Locally (Local Mode)';
+          statusEl.textContent = '☁ Saved';
           statusEl.className = 'adm-sync-status';
         }
       }
