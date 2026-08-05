@@ -22,6 +22,12 @@ export default function AdminPage() {
   const [contentInput, setContentInput] = useState('');
   const [editIdx, setEditIdx] = useState(-1);
   const [syncStatus, setSyncStatus] = useState('ready'); // ready, syncing, success, error
+  const [toast, setToast] = useState(null); // { type: 'success'|'error', text: string }
+
+  const showToast = (text, type = 'success') => {
+    setToast({ text, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   useEffect(() => {
     fetch('/api/messages')
@@ -64,6 +70,7 @@ export default function AdminPage() {
     setSyncStatus('syncing');
 
     const editingItem = editIdx >= 0 ? messages[editIdx] : null;
+    const isEditMode = editIdx >= 0;
 
     try {
       const res = await fetch('/api/messages', {
@@ -80,21 +87,18 @@ export default function AdminPage() {
       const data = await res.json();
       if (data.messages) {
         setMessages(data.messages);
-      } else {
-        let updated = [...messages];
-        if (editIdx >= 0) {
-          updated[editIdx] = { category: catInput.trim(), title: titleInput.trim(), content: contentInput.trim() };
-        } else {
-          updated.push({ category: catInput.trim(), title: titleInput.trim(), content: contentInput.trim() });
-        }
-        setMessages(updated);
       }
 
       clearForm();
       setSyncStatus('success');
+      showToast(
+        isEditMode ? '✓ Message updated in MongoDB database!' : '✓ New message saved to MongoDB database!',
+        'success'
+      );
       setTimeout(() => setSyncStatus('ready'), 3500);
     } catch (err) {
       setSyncStatus('error');
+      showToast('⚠️ Failed to save to database. Please check your connection.', 'error');
     }
   };
 
@@ -104,6 +108,7 @@ export default function AdminPage() {
     setTitleInput(msg.title);
     setContentInput(msg.content);
     setEditIdx(idx);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const deleteTemplate = async (idx) => {
@@ -122,16 +127,15 @@ export default function AdminPage() {
       const data = await res.json();
       if (data.messages) {
         setMessages(data.messages);
-      } else {
-        const updated = messages.filter((_, i) => i !== idx);
-        setMessages(updated);
       }
 
       clearForm();
       setSyncStatus('success');
+      showToast('🗑️ Message deleted from MongoDB database!', 'success');
       setTimeout(() => setSyncStatus('ready'), 3500);
     } catch (err) {
       setSyncStatus('error');
+      showToast('⚠️ Failed to delete from database.', 'error');
     }
   };
 
@@ -151,6 +155,7 @@ export default function AdminPage() {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    showToast('📥 JSON export downloaded!', 'success');
   };
 
   const filteredList = messages.reduce((acc, m, i) => {
@@ -192,6 +197,15 @@ export default function AdminPage() {
 
   return (
     <div className="adm-panel">
+      {/* Animated Toast Notification */}
+      {toast && (
+        <div className="mm-toast-container">
+          <div className={`mm-toast ${toast.type}`}>
+            <span>{toast.text}</span>
+          </div>
+        </div>
+      )}
+
       {/* Admin Navbar */}
       <nav className="adm-nav">
         <div className="adm-nav-brand">
@@ -208,7 +222,7 @@ export default function AdminPage() {
 
           <span className={`adm-sync-status ${syncStatus}`}>
             {syncStatus === 'syncing' && '⏳ Saving...'}
-            {syncStatus === 'success' && '✓ Changes Saved'}
+            {syncStatus === 'success' && '✓ Saved to DB'}
             {syncStatus === 'error' && '⚠️ Save Failed'}
             {syncStatus === 'ready' && '☁ Auto Save'}
           </span>
@@ -221,6 +235,7 @@ export default function AdminPage() {
             </svg>
             Export JSON
           </button>
+
           <button className="adm-nbtn solid" onClick={handleLogout}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
