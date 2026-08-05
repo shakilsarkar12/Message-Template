@@ -6,16 +6,16 @@ exports.handler = async function (event, context) {
     };
   }
 
-  const token = process.env.GITHUB_TOKEN;
-  const repo = process.env.GITHUB_REPO;
-  const branch = process.env.GITHUB_BRANCH || "main";
-  const path = process.env.GITHUB_FILE_PATH || "index.html";
+  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+  const repo = process.env.GH_REPO || process.env.GITHUB_REPO;
+  const branch = process.env.GH_BRANCH || "main";
+  const path = process.env.GH_FILE_PATH || "index.html";
 
   if (!token || !repo) {
     return {
       statusCode: 500,
       body: JSON.stringify({
-        error: "Missing GITHUB_TOKEN or GITHUB_REPO in Netlify Environment Variables. Please configure them in your Netlify site settings."
+        error: "Missing GH_TOKEN or GH_REPO in Netlify Environment Variables. Please set GH_TOKEN and GH_REPO in Netlify dashboard."
       })
     };
   }
@@ -93,7 +93,7 @@ exports.handler = async function (event, context) {
   } catch (err) {
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: err.message || "Server error occurred while syncing to GitHub." })
+      body: JSON.stringify({ error: err.message || "Server error occurred while syncing." })
     };
   }
 };
