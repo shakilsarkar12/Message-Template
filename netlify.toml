@@ -1,0 +1,9 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+# Redirect /admin to /index.html cleanly without URL page reload
+[[redirects]]
+  from = "/admin"
+  to = "/index.html"
+  status = 200
