@@ -198,8 +198,8 @@ export default function AdminPage() {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="#FF6B00">
             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
           </svg>
-          Message Template Admin
-          <span className="adm-nav-badge">VERCEL + MONGODB</span>
+          Message Template 
+          <span className="adm-nav-badge">Admin</span>
         </div>
         <div className="adm-nav-right">
           <span className="adm-nav-stat">
