@@ -61,22 +61,41 @@ export default function AdminPage() {
     e.preventDefault();
     if (!catInput.trim() || !titleInput.trim() || !contentInput.trim()) return;
 
-    let updated = [...messages];
-    const newMsg = {
-      category: catInput.trim(),
-      title: titleInput.trim(),
-      content: contentInput.trim()
-    };
+    setSyncStatus('syncing');
 
-    if (editIdx >= 0) {
-      updated[editIdx] = newMsg;
-    } else {
-      updated.push(newMsg);
+    const editingItem = editIdx >= 0 ? messages[editIdx] : null;
+
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingItem ? editingItem.id : undefined,
+          category: catInput.trim(),
+          title: titleInput.trim(),
+          content: contentInput.trim()
+        })
+      });
+
+      const data = await res.json();
+      if (data.messages) {
+        setMessages(data.messages);
+      } else {
+        let updated = [...messages];
+        if (editIdx >= 0) {
+          updated[editIdx] = { category: catInput.trim(), title: titleInput.trim(), content: contentInput.trim() };
+        } else {
+          updated.push({ category: catInput.trim(), title: titleInput.trim(), content: contentInput.trim() });
+        }
+        setMessages(updated);
+      }
+
+      clearForm();
+      setSyncStatus('success');
+      setTimeout(() => setSyncStatus('ready'), 3500);
+    } catch (err) {
+      setSyncStatus('error');
     }
-
-    setMessages(updated);
-    clearForm();
-    await persistMessages(updated);
   };
 
   const editTemplate = (idx) => {
@@ -88,11 +107,32 @@ export default function AdminPage() {
   };
 
   const deleteTemplate = async (idx) => {
-    if (!confirm(`Delete "${messages[idx].title}"?\nThis cannot be undone.`)) return;
-    const updated = messages.filter((_, i) => i !== idx);
-    setMessages(updated);
-    clearForm();
-    await persistMessages(updated);
+    const item = messages[idx];
+    if (!confirm(`Delete "${item.title}"?\nThis cannot be undone.`)) return;
+
+    setSyncStatus('syncing');
+
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', id: item.id })
+      });
+
+      const data = await res.json();
+      if (data.messages) {
+        setMessages(data.messages);
+      } else {
+        const updated = messages.filter((_, i) => i !== idx);
+        setMessages(updated);
+      }
+
+      clearForm();
+      setSyncStatus('success');
+      setTimeout(() => setSyncStatus('ready'), 3500);
+    } catch (err) {
+      setSyncStatus('error');
+    }
   };
 
   const clearForm = () => {
@@ -100,107 +140,6 @@ export default function AdminPage() {
     setTitleInput('');
     setContentInput('');
     setEditIdx(-1);
-  };
-
-  const GH_CREDS_KEY = 'mm_gh_direct_creds';
-
-  const utf8ToBase64 = (str) => {
-    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
-  };
-
-  const base64ToUtf8 = (str) => {
-    return decodeURIComponent(Array.prototype.map.call(atob(str.replace(/\s/g, '')), c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-  };
-
-  const directGitHubPush = async (newMessagesList) => {
-    try {
-      let creds = JSON.parse(localStorage.getItem(GH_CREDS_KEY) || '{}');
-      
-      const envRepo = process.env.NEXT_PUBLIC_GITHUB_REPO || process.env.NEXT_PUBLIC_GH_REPO || process.env.GITHUB_REPO || process.env.GH_REPO;
-      const envToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN || process.env.NEXT_PUBLIC_GH_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
-      const envBranch = process.env.NEXT_PUBLIC_GITHUB_BRANCH || process.env.GITHUB_BRANCH || 'main';
-      const envPath = process.env.NEXT_PUBLIC_GITHUB_FILE_PATH || process.env.GITHUB_FILE_PATH || 'data/messages.json';
-
-      let repo = envRepo || creds.repo;
-      let token = envToken || creds.token;
-      let branch = envBranch || creds.branch || 'main';
-      let path = envPath || creds.path || 'data/messages.json';
-
-      if (!token || !repo) {
-        const inputRepo = prompt('Enter GitHub Repository (username/repo-name):', 'shakilsarkar12/Message-Template');
-        if (!inputRepo) return false;
-        const inputToken = prompt('Enter GitHub Personal Access Token (ghp_...):');
-        if (!inputToken) return false;
-        repo = inputRepo;
-        token = inputToken;
-        localStorage.setItem(GH_CREDS_KEY, JSON.stringify({ repo, token, branch, path }));
-      }
-
-      const getRes = await fetch(`https://api.github.com/repos/${repo}/contents/${path}?ref=${branch}`, {
-        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
-      });
-
-      if (!getRes.ok) {
-        if (!envToken) localStorage.removeItem(GH_CREDS_KEY);
-        return false;
-      }
-
-      const fileData = await getRes.json();
-      const currentSha = fileData.sha;
-      const updatedContent = JSON.stringify(newMessagesList, null, 2);
-
-      const putRes = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/vnd.github.v3+json'
-        },
-        body: JSON.stringify({
-          message: `Update message templates via Admin (${newMessagesList.length} items)`,
-          content: utf8ToBase64(updatedContent),
-          sha: currentSha,
-          branch: branch
-        })
-      });
-
-      return putRes.ok;
-    } catch (e) {
-      return false;
-    }
-  };
-
-  const persistMessages = async (newMessagesList) => {
-    setSyncStatus('syncing');
-    try {
-      const res = await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessagesList })
-      }).catch(() => null);
-
-      if (res && res.ok) {
-        setSyncStatus('success');
-        setTimeout(() => setSyncStatus('ready'), 3500);
-        return;
-      }
-
-      const ok = await directGitHubPush(newMessagesList);
-      if (ok) {
-        setSyncStatus('success');
-        setTimeout(() => setSyncStatus('ready'), 3500);
-      } else {
-        setSyncStatus('error');
-      }
-    } catch (err) {
-      const ok = await directGitHubPush(newMessagesList);
-      if (ok) {
-        setSyncStatus('success');
-        setTimeout(() => setSyncStatus('ready'), 3500);
-      } else {
-        setSyncStatus('error');
-      }
-    }
   };
 
   const exportJSON = () => {
@@ -215,10 +154,29 @@ export default function AdminPage() {
   };
 
   const resetDefaults = async () => {
-    if (!confirm('Reset ALL templates to factory defaults?\n\nAll custom changes will be lost!')) return;
-    setMessages(initialMessagesData);
-    clearForm();
-    await persistMessages(initialMessagesData);
+    if (!confirm('Reset ALL templates to factory defaults in MongoDB?\n\nAll custom changes will be lost!')) return;
+
+    setSyncStatus('syncing');
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset' })
+      });
+
+      const data = await res.json();
+      if (data.messages) {
+        setMessages(data.messages);
+      } else {
+        setMessages(initialMessagesData);
+      }
+
+      clearForm();
+      setSyncStatus('success');
+      setTimeout(() => setSyncStatus('ready'), 3500);
+    } catch (err) {
+      setSyncStatus('error');
+    }
   };
 
   const filteredList = messages.reduce((acc, m, i) => {
@@ -267,7 +225,7 @@ export default function AdminPage() {
             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
           </svg>
           Message Template Admin
-          <span className="adm-nav-badge">NEXT.JS ADMIN</span>
+          <span className="adm-nav-badge">VERCEL + MONGODB</span>
         </div>
         <div className="adm-nav-right">
           <span className="adm-nav-stat">
@@ -390,7 +348,7 @@ export default function AdminPage() {
               {filteredList.map(({ m, i }) => {
                 const preview = m.content.replace(/\n/g, ' ').substring(0, 130);
                 return (
-                  <div key={i} className="adm-msg-card">
+                  <div key={m.id || i} className="adm-msg-card">
                     <div className="adm-msg-head">
                       <div className="adm-msg-info">
                         <div className="adm-msg-title">{m.title}</div>

@@ -1,88 +1,108 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import dbConnect from '@/lib/mongodb';
+import Message from '@/models/Message';
+import initialMessagesData from '@/data/messages.json';
 
 const dataFilePath = path.join(process.cwd(), 'data', 'messages.json');
 
-function getMessagesFromFile() {
+export async function GET() {
+  try {
+    if (process.env.MONGODB_URI) {
+      await dbConnect();
+      let messages = await Message.find({}).sort({ createdAt: 1 }).lean();
+      
+      // Auto-seed initial 50 Shopify templates if MongoDB collection is empty
+      if (!messages || messages.length === 0) {
+        await Message.insertMany(initialMessagesData);
+        messages = await Message.find({}).sort({ createdAt: 1 }).lean();
+      }
+
+      const formatted = messages.map(m => ({
+        id: m._id.toString(),
+        category: m.category,
+        title: m.title,
+        content: m.content
+      }));
+
+      return NextResponse.json({ messages: formatted, source: 'mongodb' });
+    }
+  } catch (error) {
+    console.warn('MongoDB connection failed, falling back to JSON file:', error.message);
+  }
+
+  // Fallback to JSON file
   try {
     if (fs.existsSync(dataFilePath)) {
       const fileData = fs.readFileSync(dataFilePath, 'utf8');
-      return JSON.parse(fileData);
+      return NextResponse.json({ messages: JSON.parse(fileData), source: 'json' });
     }
-  } catch (e) {
-    console.error('Error reading messages.json:', e);
-  }
-  return [];
-}
+  } catch (e) {}
 
-export async function GET() {
-  const messages = getMessagesFromFile();
-  return NextResponse.json({ messages });
+  return NextResponse.json({ messages: initialMessagesData, source: 'default' });
 }
 
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { messages } = body;
+    const { action, id, category, title, content, messages } = body;
 
-    if (!Array.isArray(messages)) {
-      return NextResponse.json({ error: 'Invalid messages array provided.' }, { status: 400 });
+    // MongoDB Mode
+    if (process.env.MONGODB_URI) {
+      await dbConnect();
+
+      if (action === 'delete' && id) {
+        await Message.findByIdAndDelete(id);
+        const updated = await Message.find({}).sort({ createdAt: 1 }).lean();
+        return NextResponse.json({ success: true, messages: formatMessages(updated) });
+      }
+
+      if (action === 'reset') {
+        await Message.deleteMany({});
+        await Message.insertMany(initialMessagesData);
+        const reseted = await Message.find({}).sort({ createdAt: 1 }).lean();
+        return NextResponse.json({ success: true, messages: formatMessages(reseted) });
+      }
+
+      if (id) {
+        // Edit existing message
+        await Message.findByIdAndUpdate(id, { category, title, content });
+      } else if (category && title && content) {
+        // Add new message
+        await Message.create({ category, title, content });
+      } else if (Array.isArray(messages)) {
+        // Sync whole list
+        await Message.deleteMany({});
+        await Message.insertMany(messages);
+      }
+
+      const updated = await Message.find({}).sort({ createdAt: 1 }).lean();
+      return NextResponse.json({ success: true, messages: formatMessages(updated) });
     }
-
-    // Ensure data folder exists & write JSON file
-    const dataDir = path.join(process.cwd(), 'data');
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    fs.writeFileSync(dataFilePath, JSON.stringify(messages, null, 2), 'utf8');
-
-    // Trigger GitHub API sync in background if environment variables are set
-    triggerGitHubSync(messages).catch(err => console.error('GitHub Sync Warning:', err.message));
-
-    return NextResponse.json({ success: true, message: 'Messages updated successfully.' });
   } catch (error) {
-    return NextResponse.json({ error: error.message || 'Failed to update messages.' }, { status: 500 });
+    console.warn('MongoDB mutation warning:', error.message);
+  }
+
+  // Fallback JSON file update
+  try {
+    const body = await request.json();
+    if (Array.isArray(body.messages)) {
+      const dataDir = path.join(process.cwd(), 'data');
+      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(dataFilePath, JSON.stringify(body.messages, null, 2), 'utf8');
+    }
+    return NextResponse.json({ success: true, message: 'Saved locally' });
+  } catch (e) {
+    return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
   }
 }
 
-async function triggerGitHubSync(messages) {
-  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
-  const repo = process.env.GITHUB_REPO || process.env.GH_REPO;
-  const branch = process.env.GITHUB_BRANCH || process.env.GH_BRANCH || 'main';
-  const filePath = process.env.GITHUB_FILE_PATH || process.env.GH_FILE_PATH || 'data/messages.json';
-
-  if (!token || !repo) return;
-
-  const url = `https://api.github.com/repos/${repo}/contents/${filePath}?ref=${branch}`;
-  const getRes = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'NextJS-App'
-    }
-  });
-
-  if (!getRes.ok) return;
-
-  const fileData = await getRes.json();
-  const currentSha = fileData.sha;
-  const updatedContent = JSON.stringify(messages, null, 2);
-  const updatedBase64 = Buffer.from(updatedContent, 'utf-8').toString('base64');
-
-  await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}`, {
-    method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'NextJS-App'
-    },
-    body: JSON.stringify({
-      message: `Update messages via Next.js Admin (${messages.length} templates)`,
-      content: updatedBase64,
-      sha: currentSha,
-      branch: branch
-    })
-  });
+function formatMessages(messages) {
+  return messages.map(m => ({
+    id: m._id ? m._id.toString() : m.id,
+    category: m.category,
+    title: m.title,
+    content: m.content
+  }));
 }
