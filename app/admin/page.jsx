@@ -115,22 +115,33 @@ export default function AdminPage() {
   const directGitHubPush = async (newMessagesList) => {
     try {
       let creds = JSON.parse(localStorage.getItem(GH_CREDS_KEY) || '{}');
-      if (!creds.token || !creds.repo) {
-        const repo = prompt('Enter GitHub Repository (username/repo-name):', 'shakilsarkar12/Message-Template');
-        if (!repo) return false;
-        const token = prompt('Enter GitHub Personal Access Token (ghp_...):');
-        if (!token) return false;
-        creds = { repo, token, branch: 'main', path: 'data/messages.json' };
-        localStorage.setItem(GH_CREDS_KEY, JSON.stringify(creds));
+      
+      const envRepo = process.env.NEXT_PUBLIC_GITHUB_REPO || process.env.NEXT_PUBLIC_GH_REPO || process.env.GITHUB_REPO || process.env.GH_REPO;
+      const envToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN || process.env.NEXT_PUBLIC_GH_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+      const envBranch = process.env.NEXT_PUBLIC_GITHUB_BRANCH || process.env.GITHUB_BRANCH || 'main';
+      const envPath = process.env.NEXT_PUBLIC_GITHUB_FILE_PATH || process.env.GITHUB_FILE_PATH || 'data/messages.json';
+
+      let repo = envRepo || creds.repo;
+      let token = envToken || creds.token;
+      let branch = envBranch || creds.branch || 'main';
+      let path = envPath || creds.path || 'data/messages.json';
+
+      if (!token || !repo) {
+        const inputRepo = prompt('Enter GitHub Repository (username/repo-name):', 'shakilsarkar12/Message-Template');
+        if (!inputRepo) return false;
+        const inputToken = prompt('Enter GitHub Personal Access Token (ghp_...):');
+        if (!inputToken) return false;
+        repo = inputRepo;
+        token = inputToken;
+        localStorage.setItem(GH_CREDS_KEY, JSON.stringify({ repo, token, branch, path }));
       }
 
-      const { repo, token, branch = 'main', path = 'data/messages.json' } = creds;
       const getRes = await fetch(`https://api.github.com/repos/${repo}/contents/${path}?ref=${branch}`, {
         headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
       });
 
       if (!getRes.ok) {
-        localStorage.removeItem(GH_CREDS_KEY);
+        if (!envToken) localStorage.removeItem(GH_CREDS_KEY);
         return false;
       }
 
