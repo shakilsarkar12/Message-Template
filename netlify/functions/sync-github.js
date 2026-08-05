@@ -15,7 +15,7 @@ exports.handler = async function (event, context) {
     return {
       statusCode: 500,
       body: JSON.stringify({
-        error: "Missing GH_TOKEN or GH_REPO in Netlify Environment Variables. Please set GH_TOKEN and GH_REPO in Netlify dashboard."
+        error: "Missing GH_TOKEN or GH_REPO in Netlify Environment Variables. Please set GH_TOKEN and GH_REPO in Netlify Dashboard."
       })
     };
   }
@@ -51,11 +51,11 @@ exports.handler = async function (event, context) {
     const currentSha = fileData.sha;
     const remoteContent = Buffer.from(fileData.content, "base64").toString("utf-8");
 
-    // 2. Replace messages array in remote index.html
+    // 2. Safely replace messages array without $ regex corruption
     const messagesJson = JSON.stringify(messages, null, 2);
     const updatedContent = remoteContent.replace(
       /(const\s+messages\s*=\s*\[)[\s\S]*?(\];)/,
-      `$1\n${messagesJson.slice(1, -1)}\n    $2`
+      () => `const messages = ${messagesJson};`
     );
 
     const updatedBase64 = Buffer.from(updatedContent, "utf-8").toString("base64");
@@ -70,7 +70,7 @@ exports.handler = async function (event, context) {
         "User-Agent": "Netlify-Function"
       },
       body: JSON.stringify({
-        message: `Update message templates via Netlify Admin (${messages.length} items)`,
+        message: `Update message templates via Admin (${messages.length} templates)`,
         content: updatedBase64,
         sha: currentSha,
         branch: branch

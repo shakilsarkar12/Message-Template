@@ -856,11 +856,19 @@
 
     const _defaults = messages.map(m => Object.assign({}, m));
 
-    // Load from localStorage if present
+    // Storage sync: use server messages as source of truth, fallback to local draft if editing
     (function () {
       try {
         const s = localStorage.getItem(MM_STORE);
-        if (s) { const p = JSON.parse(s); if (Array.isArray(p) && p.length) messages.splice(0, messages.length, ...p); }
+        if (s) {
+          const p = JSON.parse(s);
+          if (Array.isArray(p) && p.length && window.location.hash === '#admin') {
+            messages.splice(0, messages.length, ...p);
+          } else {
+            // Update local cache with fresh server deployment
+            localStorage.setItem(MM_STORE, JSON.stringify(messages));
+          }
+        }
       } catch (e) {}
     })();
 
@@ -1167,6 +1175,8 @@
           body: JSON.stringify({ messages })
         });
 
+        const resData = await netlifyRes.json().catch(() => ({}));
+
         if (netlifyRes.ok) {
           if (statusEl) {
             statusEl.textContent = '✓ Changes Saved';
@@ -1180,13 +1190,16 @@
           return;
         }
 
+        console.error('Sync Error:', resData.error);
         if (statusEl) {
-          statusEl.textContent = '☁ Saved';
-          statusEl.className = 'adm-sync-status';
+          statusEl.textContent = '⚠️ Save Failed';
+          statusEl.className = 'adm-sync-status error';
         }
+        alert('⚠️ Auto-Sync Warning:\n' + (resData.error || 'Failed to push to GitHub. Please check GH_TOKEN and GH_REPO in Netlify Environment Variables.'));
       } catch (err) {
+        console.warn('Local Mode (offline):', err.message);
         if (statusEl) {
-          statusEl.textContent = '☁ Saved';
+          statusEl.textContent = '☁ Local Only';
           statusEl.className = 'adm-sync-status';
         }
       }
