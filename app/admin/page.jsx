@@ -102,6 +102,63 @@ export default function AdminPage() {
     setEditIdx(-1);
   };
 
+  const GH_CREDS_KEY = 'mm_gh_direct_creds';
+
+  const utf8ToBase64 = (str) => {
+    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
+  };
+
+  const base64ToUtf8 = (str) => {
+    return decodeURIComponent(Array.prototype.map.call(atob(str.replace(/\s/g, '')), c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+  };
+
+  const directGitHubPush = async (newMessagesList) => {
+    try {
+      let creds = JSON.parse(localStorage.getItem(GH_CREDS_KEY) || '{}');
+      if (!creds.token || !creds.repo) {
+        const repo = prompt('Enter GitHub Repository (username/repo-name):', 'shakilsarkar12/Message-Template');
+        if (!repo) return false;
+        const token = prompt('Enter GitHub Personal Access Token (ghp_...):');
+        if (!token) return false;
+        creds = { repo, token, branch: 'main', path: 'data/messages.json' };
+        localStorage.setItem(GH_CREDS_KEY, JSON.stringify(creds));
+      }
+
+      const { repo, token, branch = 'main', path = 'data/messages.json' } = creds;
+      const getRes = await fetch(`https://api.github.com/repos/${repo}/contents/${path}?ref=${branch}`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+      });
+
+      if (!getRes.ok) {
+        localStorage.removeItem(GH_CREDS_KEY);
+        return false;
+      }
+
+      const fileData = await getRes.json();
+      const currentSha = fileData.sha;
+      const updatedContent = JSON.stringify(newMessagesList, null, 2);
+
+      const putRes = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/vnd.github.v3+json'
+        },
+        body: JSON.stringify({
+          message: `Update message templates via Admin (${newMessagesList.length} items)`,
+          content: utf8ToBase64(updatedContent),
+          sha: currentSha,
+          branch: branch
+        })
+      });
+
+      return putRes.ok;
+    } catch (e) {
+      return false;
+    }
+  };
+
   const persistMessages = async (newMessagesList) => {
     setSyncStatus('syncing');
     try {
@@ -109,15 +166,29 @@ export default function AdminPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: newMessagesList })
-      });
-      if (res.ok) {
+      }).catch(() => null);
+
+      if (res && res.ok) {
+        setSyncStatus('success');
+        setTimeout(() => setSyncStatus('ready'), 3500);
+        return;
+      }
+
+      const ok = await directGitHubPush(newMessagesList);
+      if (ok) {
         setSyncStatus('success');
         setTimeout(() => setSyncStatus('ready'), 3500);
       } else {
         setSyncStatus('error');
       }
     } catch (err) {
-      setSyncStatus('error');
+      const ok = await directGitHubPush(newMessagesList);
+      if (ok) {
+        setSyncStatus('success');
+        setTimeout(() => setSyncStatus('ready'), 3500);
+      } else {
+        setSyncStatus('error');
+      }
     }
   };
 
