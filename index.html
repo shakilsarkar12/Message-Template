@@ -610,28 +610,35 @@
     .adm-act-btn.del:hover { background: #fff1f2; border-color: #ef4444; color: #ef4444; }
     .adm-empty { text-align: center; padding: 60px 20px; color: #9ca3af; font-size: 0.9rem; }
 
-    /* GitHub Modal */
-    .gh-modal-overlay {
-      position: fixed; inset: 0; z-index: 30000;
-      display: none; background: rgba(0,0,0,0.65);
-      backdrop-filter: blur(5px);
-      align-items: center; justify-content: center;
+    /* Auto Sync Status Badge */
+    .adm-sync-status {
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: rgba(255,255,255,0.65);
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      padding: 5px 10px;
+      transition: all 0.3s;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
     }
-    .gh-modal-overlay.active { display: flex; }
-    .gh-modal-card {
-      background: #fff; border-radius: 12px;
-      padding: 28px 32px; width: 480px; max-width: 92vw;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+    .adm-sync-status.syncing {
+      color: #FF6B00;
+      background: rgba(255,107,0,0.12);
+      border-color: rgba(255,107,0,0.3);
     }
-    .gh-modal-card h3 { font-size: 1.15rem; font-weight: 700; color: #111827; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
-    .gh-modal-card p { font-size: 0.84rem; color: #6b7280; margin-bottom: 20px; line-height: 1.5; }
-    .gh-modal-field { margin-bottom: 14px; }
-    .gh-modal-field label { display: block; font-size: 0.75rem; font-weight: 600; color: #374151; margin-bottom: 5px; text-transform: uppercase; }
-    .gh-modal-field input { width: 100%; padding: 9px 12px; border: 1.5px solid #d1d5db; border-radius: 6px; font-size: 0.88rem; font-family: inherit; outline: none; }
-    .gh-modal-field input:focus { border-color: #FF6B00; }
-    .gh-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
-    .gh-modal-help { font-size: 0.78rem; color: #6b7280; margin-top: 10px; line-height: 1.4; background: #f9fafb; padding: 10px; border-radius: 6px; border: 1px solid #e5e7eb; }
-    .gh-modal-help a { color: #FF6B00; text-decoration: none; font-weight: 600; }
+    .adm-sync-status.success {
+      color: #10b981;
+      background: rgba(16,185,129,0.12);
+      border-color: rgba(16,185,129,0.3);
+    }
+    .adm-sync-status.error {
+      color: #ef4444;
+      background: rgba(239,68,68,0.12);
+      border-color: rgba(239,68,68,0.3);
+    }
   </style>
 </head>
 
@@ -719,13 +726,7 @@
       </div>
       <div class="adm-nav-right">
         <span class="adm-nav-stat" id="admNavStat"></span>
-        <button class="adm-nbtn orange" id="admGhPushBtn" onclick="pushToGitHub()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          ☁ Push to GitHub
-        </button>
-        <button class="adm-nbtn" onclick="openGhModal()">
-          ⚙ GitHub Settings
-        </button>
+        <span id="admSyncStatus" class="adm-sync-status">☁ Auto-Sync Ready</span>
         <button class="adm-nbtn" onclick="admExportJSON()">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export JSON
@@ -774,39 +775,6 @@
           </select>
         </div>
         <div id="admList"></div>
-    </div>
-  </div>
-
-  <!-- ── GitHub Settings Modal ── -->
-  <div id="ghModal" class="gh-modal-overlay">
-    <div class="gh-modal-card">
-      <h3>⚙ GitHub Auto-Sync Settings</h3>
-      <p>Configure your GitHub repository details so that Admin changes push directly to GitHub for all users globally.</p>
-      <form onsubmit="return saveGhSettings(event)">
-        <div class="gh-modal-field">
-          <label>GitHub Repository (username/repo-name)</label>
-          <input type="text" id="ghRepo" placeholder="e.g. shakildev/message-template" required>
-        </div>
-        <div class="gh-modal-field">
-          <label>Branch</label>
-          <input type="text" id="ghBranch" placeholder="main" value="main" required>
-        </div>
-        <div class="gh-modal-field">
-          <label>File Path in Repo</label>
-          <input type="text" id="ghFilePath" placeholder="index.html" value="index.html" required>
-        </div>
-        <div class="gh-modal-field">
-          <label>GitHub Personal Access Token (PAT)</label>
-          <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxxxxxxx" required>
-        </div>
-        <div class="gh-modal-help">
-          💡 <strong>How to get a Token:</strong> Go to <a href="https://github.com/settings/tokens" target="_blank">GitHub Settings → Developer Settings → Tokens (classic)</a>, generate a token with <code>repo</code> access, and paste it here.
-        </div>
-        <div class="gh-modal-actions">
-          <button type="button" class="adm-btn" onclick="closeGhModal()">Cancel</button>
-          <button type="submit" class="adm-btn primary">Save GitHub Settings</button>
-        </div>
-      </form>
     </div>
   </div>
 
@@ -1120,6 +1088,7 @@
       admRefreshCats();
       renderAdminList();
       updateAdmStat();
+      autoPushToGitHub();
       return false;
     }
 
@@ -1142,6 +1111,7 @@
       renderAdminList();
       updateAdmStat();
       clearAdmForm();
+      autoPushToGitHub();
     }
 
     function clearAdmForm() {
@@ -1171,6 +1141,7 @@
       messages.splice(0, messages.length, ..._defaults.map(m => Object.assign({}, m)));
       localStorage.removeItem(MM_STORE);
       admRefreshCats(); renderAdminList(); updateAdmStat(); clearAdmForm();
+      autoPushToGitHub();
     }
 
     function escAdm(s) {
@@ -1178,53 +1149,18 @@
     }
 
     // ═══════════════════════════════════════════════════
-    //  GITHUB AUTO-SYNC API MODULE
+    //  AUTOMATIC BACKGROUND GITHUB SYNC
     // ═══════════════════════════════════════════════════
-    const GH_STORE = 'mm_gh_settings';
+    let syncTimer = null;
 
-    function openGhModal() {
-      const s = JSON.parse(localStorage.getItem(GH_STORE) || '{}');
-      document.getElementById('ghRepo').value = s.repo || '';
-      document.getElementById('ghBranch').value = s.branch || 'main';
-      document.getElementById('ghFilePath').value = s.path || 'index.html';
-      document.getElementById('ghToken').value = s.token || '';
-      document.getElementById('ghModal').classList.add('active');
-    }
-
-    function closeGhModal() {
-      document.getElementById('ghModal').classList.remove('active');
-    }
-
-    function saveGhSettings(e) {
-      e.preventDefault();
-      const settings = {
-        repo: document.getElementById('ghRepo').value.trim(),
-        branch: document.getElementById('ghBranch').value.trim() || 'main',
-        path: document.getElementById('ghFilePath').value.trim() || 'index.html',
-        token: document.getElementById('ghToken').value.trim()
-      };
-      localStorage.setItem(GH_STORE, JSON.stringify(settings));
-      closeGhModal();
-      alert('✅ GitHub settings saved successfully!');
-      return false;
-    }
-
-    function utf8ToBase64(str) {
-      return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
-    }
-
-    function base64ToUtf8(str) {
-      return decodeURIComponent(Array.prototype.map.call(atob(str.replace(/\s/g, '')), c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-    }
-
-    async function pushToGitHub() {
-      const syncBtn = document.getElementById('admGhPushBtn');
-      const origHtml = syncBtn.innerHTML;
-      syncBtn.innerHTML = '⏳ Syncing...';
-      syncBtn.disabled = true;
+    async function autoPushToGitHub() {
+      const statusEl = document.getElementById('admSyncStatus');
+      if (statusEl) {
+        statusEl.textContent = '⏳ Auto-Syncing...';
+        statusEl.className = 'adm-sync-status syncing';
+      }
 
       try {
-        // 1. Try Netlify Serverless Function (reads token & repo securely from Netlify Environment Variables)
         const netlifyRes = await fetch('/.netlify/functions/sync-github', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1232,78 +1168,28 @@
         });
 
         if (netlifyRes.ok) {
-          const resData = await netlifyRes.json();
-          alert('🎉 Success! ' + (resData.message || 'Synced to GitHub repository!') + '\n\nNetlify will automatically rebuild your site so all users see the new templates within 1-2 minutes.');
+          if (statusEl) {
+            statusEl.textContent = '✅ Synced to GitHub';
+            statusEl.className = 'adm-sync-status success';
+            clearTimeout(syncTimer);
+            syncTimer = setTimeout(() => {
+              statusEl.textContent = '☁ Auto-Sync Ready';
+              statusEl.className = 'adm-sync-status';
+            }, 4000);
+          }
           return;
         }
 
-        // If Netlify function returned an error response
         const netlifyErr = await netlifyRes.json().catch(() => ({}));
-        
-        // If Netlify env vars are not set up or running locally, check local settings
-        if (netlifyRes.status === 404 || (netlifyErr.error && netlifyErr.error.includes("Environment Variables"))) {
-          const settings = JSON.parse(localStorage.getItem(GH_STORE) || '{}');
-          if (!settings.token || !settings.repo) {
-            alert('ℹ️ Netlify Environment Variables or Local GitHub Token not configured.\n\n' + (netlifyErr.error || 'Please set GITHUB_TOKEN & GITHUB_REPO in Netlify Dashboard or configure local settings.'));
-            openGhModal();
-            return;
-          }
-
-          // Local fallback via Direct GitHub API call
-          const { repo, branch = 'main', path = 'index.html', token } = settings;
-          const url = `https://api.github.com/repos/${repo}/contents/${path}?ref=${branch}`;
-
-          const getRes = await fetch(url, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Accept': 'application/vnd.github.v3+json'
-            }
-          });
-
-          if (!getRes.ok) {
-            const err = await getRes.json().catch(() => ({}));
-            throw new Error(err.message || `Could not fetch ${path} from ${repo}.`);
-          }
-
-          const fileData = await getRes.json();
-          const currentSha = fileData.sha;
-          const remoteContent = base64ToUtf8(fileData.content);
-
-          const messagesJson = JSON.stringify(messages, null, 2);
-          const updatedContent = remoteContent.replace(
-            /(const\s+messages\s*=\s*\[)[\s\S]*?(\];)/,
-            `$1\n${messagesJson.slice(1, -1)}\n    $2`
-          );
-
-          const putRes = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-              'Accept': 'application/vnd.github.v3+json'
-            },
-            body: JSON.stringify({
-              message: `Update message templates via Admin Panel (${messages.length} templates)`,
-              content: utf8ToBase64(updatedContent),
-              sha: currentSha,
-              branch: branch
-            })
-          });
-
-          if (!putRes.ok) {
-            const err = await putRes.json().catch(() => ({}));
-            throw new Error(err.message || 'Failed to commit changes to GitHub.');
-          }
-
-          alert('🎉 Success! Pushed directly to GitHub repository!\n\nAll live users will see the new content automatically in 1-2 minutes.');
-        } else {
-          throw new Error(netlifyErr.error || 'Netlify sync failed.');
+        if (statusEl) {
+          statusEl.textContent = '⚠️ Sync Notice: ' + (netlifyErr.error || 'Check Netlify env');
+          statusEl.className = 'adm-sync-status error';
         }
       } catch (err) {
-        alert('❌ GitHub Sync Failed:\n' + err.message);
-      } finally {
-        syncBtn.innerHTML = origHtml;
-        syncBtn.disabled = false;
+        if (statusEl) {
+          statusEl.textContent = '☁ Saved Locally (Local Mode)';
+          statusEl.className = 'adm-sync-status';
+        }
       }
     }
   </script>
