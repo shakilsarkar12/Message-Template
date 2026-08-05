@@ -6,16 +6,16 @@ exports.handler = async function (event, context) {
     };
   }
 
-  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
-  const repo = process.env.GH_REPO || process.env.GITHUB_REPO;
-  const branch = process.env.GH_BRANCH || "main";
-  const path = process.env.GH_FILE_PATH || "index.html";
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  const repo = process.env.GITHUB_REPO || process.env.GH_REPO;
+  const branch = process.env.GITHUB_BRANCH || process.env.GH_BRANCH || "main";
+  const path = process.env.GITHUB_FILE_PATH || process.env.GH_FILE_PATH || "index.html";
 
   if (!token || !repo) {
     return {
       statusCode: 500,
       body: JSON.stringify({
-        error: "Missing GH_TOKEN or GH_REPO in Netlify Environment Variables. Please set GH_TOKEN and GH_REPO in Netlify Dashboard."
+        error: "Missing GITHUB_TOKEN/GH_TOKEN or GITHUB_REPO/GH_REPO in Netlify Environment Variables."
       })
     };
   }
@@ -43,7 +43,7 @@ exports.handler = async function (event, context) {
       const err = await getRes.json().catch(() => ({}));
       return {
         statusCode: getRes.status,
-        body: JSON.stringify({ error: err.message || `Could not fetch ${path} from ${repo}` })
+        body: JSON.stringify({ error: err.message || `Could not fetch ${path} from ${repo}. Check repository name & permissions.` })
       };
     }
 
@@ -70,7 +70,7 @@ exports.handler = async function (event, context) {
         "User-Agent": "Netlify-Function"
       },
       body: JSON.stringify({
-        message: `Update message templates via Admin (${messages.length} templates)`,
+        message: `Update message templates via Netlify Admin (${messages.length} items)`,
         content: updatedBase64,
         sha: currentSha,
         branch: branch
