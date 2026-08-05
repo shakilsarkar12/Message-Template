@@ -92,13 +92,13 @@ export default function AdminPage() {
       clearForm();
       setSyncStatus('success');
       showToast(
-        isEditMode ? '✓ Message updated in MongoDB database!' : '✓ New message saved to MongoDB database!',
+        isEditMode ? '✓ Message updated' : '✓ New message saved',
         'success'
       );
       setTimeout(() => setSyncStatus('ready'), 3500);
     } catch (err) {
       setSyncStatus('error');
-      showToast('⚠️ Failed to save to database. Please check your connection.', 'error');
+      showToast('⚠️ Failed to save', 'error');
     }
   };
 
@@ -131,11 +131,11 @@ export default function AdminPage() {
 
       clearForm();
       setSyncStatus('success');
-      showToast('🗑️ Message deleted from MongoDB database!', 'success');
+      showToast('🗑️ Message deleted', 'success');
       setTimeout(() => setSyncStatus('ready'), 3500);
     } catch (err) {
       setSyncStatus('error');
-      showToast('⚠️ Failed to delete from database.', 'error');
+      showToast('⚠️ Failed to delete', 'error');
     }
   };
 
